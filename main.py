@@ -5,19 +5,36 @@ from utils import error
 
 app = FastAPI()
 
+
 # -------------------------------------------------------------------
-# 0) Rota obrigatória para o CloudDrive
-#    O addon SEMPRE chama: GET /ip
+# 0) Rota obrigatória — CloudDrive sempre chama esta primeiro
 # -------------------------------------------------------------------
 @app.get("/ip")
 async def get_ip(request: Request):
-    # Descobre o IP do cliente
     client_ip = request.client.host
-    return JSONResponse({"ip": client_ip})
+    return {"ip": client_ip}
 
 
 # -------------------------------------------------------------------
-# 1) Criar URL de login (addon chama isso)
+# 1) Rota EXIGIDA pelo CloudDrive (essa é a que faltava!)
+# -------------------------------------------------------------------
+@app.get("/pin")
+async def pin(client_id: str, redirect_uri: str):
+    """
+    CloudDrive chama isso para obter o link de autorização.
+    """
+    url = GoogleOAuth.build_auth_url(client_id, redirect_uri)
+
+    # CloudDrive espera SEMPRE ESSES CAMPOS:
+    return {
+        "pin": "",             # CloudDrive não usa PIN real
+        "password": "",        # idem
+        "verification_url": url
+    }
+
+
+# -------------------------------------------------------------------
+# 2) Alternativa opcional (pode manter se quiser compatibilidade)
 # -------------------------------------------------------------------
 @app.get("/create_pin")
 async def create_pin(client_id: str, redirect_uri: str):
@@ -31,7 +48,7 @@ async def create_pin(client_id: str, redirect_uri: str):
 
 
 # -------------------------------------------------------------------
-# 2) Trocar CODE -> TOKENS
+# 3) Trocar CODE → TOKENS (chamado após login Google)
 # -------------------------------------------------------------------
 @app.post("/token")
 async def get_tokens(request: Request):
@@ -54,7 +71,7 @@ async def get_tokens(request: Request):
 
 
 # -------------------------------------------------------------------
-# 3) Refresh token
+# 4) Refresh Token
 # -------------------------------------------------------------------
 @app.post("/refresh")
 async def refresh_tokens(request: Request):
